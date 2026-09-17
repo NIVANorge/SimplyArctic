@@ -15,6 +15,7 @@ Authors: Leah A. Jackson-Blake
     par_group("Reach parameters", river) {
         length   : par_real("Reach length", [m], 10000, 50, 10000000)
         velocity : par_real("Mean velocity", [m, s-1], 0.3, 0.0001, 8, "Mean water velocity in the reach")
+        constant_baseflow: par_real("Constant baseflow input", [m 3, day -1], 0, 0, 100, "Constant input of deep water year round. E.g. Use to set river concentrations to zero when flow is zero")
     }
     
     #TODO: The initflow seems pointless in this implementation?
@@ -32,6 +33,9 @@ Authors: Leah A. Jackson-Blake
     } @initial { init_flow } @no_store
     
     flux(river.water, river_target, [m 3, s-1], "Daily mean reach flow")  {  flow ->>  }
+    
+    # Fudge to force river concentrations to go to zero when flow is zero. Otherwise river concentrations have same conc as during autumn when flow stopped, so get poor model performance stats if don't simulate snowmelt starting at quite the right time.
+    flux(out, river.water, [m 3, s-1], "Constant baseflow") { constant_baseflow ->> }
     
     specific_q : property("Subcatchment specific discharge")
     var(river.water.specific_q, [m m, day-1], "Specific discharge") { 

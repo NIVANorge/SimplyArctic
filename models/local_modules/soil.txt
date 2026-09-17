@@ -1,20 +1,105 @@
 module("SimplyPermafrostFlow", version(0, 0, 1),
     soil : compartment,
     water : quantity,
+    flow : property,
     runoff_target : loc
 ) {
+"""
+Compute soil runoff.
+
+Authors: Leah A. Jackson-Blake, Magnus D. Norling
+"""
+    # TODO: Name of module is misleading. Soil hydrology is not affected by permafrost
 
 	load("stdlib/basic_math.txt", library("Response"))
-	
-	par_group("Hydrology land", soil) {
-		fc     : par_real("Field capacity", [m m],                     120,  0, 1000)
-		tc_s   : par_real("Soil water time constant", [day],             2,  1,   40)
-	}
 		
-	var(soil.water, [m m], "Soil water volume")  @initial { fc }
-	
-	flux(soil.water, runoff_target, [m m, day-1], "Soil runoff") { 
-		rate := (water - fc)/tc_s,
-		s_response(water, fc, 1.01*fc, 0, rate) # smoothly turn the flow rate on between water volumes of fc and 1.01*fc
-	}
+    par_group("Hydrology land", soil) {
+        fc     : par_real("Field capacity", [m m],                     120,  0, 1000)
+        tc_s   : par_real("Soil water time constant", [day],             2,  0.2,   40)
+    }
+        
+    var(soil.water, [m m], "Soil water volume")  @initial { fc }
+    
+    # In this simple version, assume PET is small and simplify to 0
+    # flux(soil.water, out, [m m, day-1], "Evapotranspiration") {
+        # 0 if (aggregate(snow_box.snow) > ice_epsilon) | (glacier.ice > ice_epsilon),
+        # s_response(water, 0.5*fc, fc, 0, pet) otherwise
+    # } @no_carry  # Don't carry dissolved substances in the evapotranspiration
+    
+    var(soil.water.flow, [m m, day-1], "Soil water flow"){ 
+        rate := (water - fc)/tc_s,
+        s_response(water, fc, 1.01*fc, 0, rate) # smoothly turn the flow on above fc
+    }
+    
+    flux(soil.water, runoff_target, [m m, day-1], "Soil runoff") { flow }
+}
+
+module("SimplyPermafrost", version(0, 0, 1),
+    air  : compartment,
+    soil : compartment,
+    snow_box : compartment,
+    glacier : compartment,
+    snow : quantity,
+    ice  : quantity,
+    temp : property,
+    thaw_depth : property,
+) {
+"""
+Module to compute soil temperature and thaw depth
+
+Authors: Leah A. Jackson-Blake
+"""
+    
+    load("stdlib/basic_math.txt", library("Response"))
+    
+    # proportion_al : property("Proportion in active layer")
+    # var(soil.water.proportion_al, []) { 1 - (in_flux(soil.water) / infiltration) }
+    
+    par_group("Soil temperature") {
+        T_b      : par_real("Deep soil temperature", [deg_c], -2, -10, -0.1, "Near-constant soil temperature within deep permantly-frozen soil horizon")
+        b        : par_real("Thermal damping depth", [m m], 1500, 100, 5000, "Exponential decay depth, i.e. depth over which surface temperature changes by 63% (e^-1)")
+        soilT_lag : par_real("Soil temp lag factor", [], 0.005, 0.002, 0.02, "Introduces thermal inertia so surface soil T lags behind air T. Related to soil heat conduction divided by heat capacity")
+        #snow_d_factor : par_real("Snow insulation depth", [m m], 2000, 500, 5000, "Snow depth at which the soil is completely insulated")
+        # TODO: can we simplify this more somehow? What is the model sensitive to?
+    }
+    
+    var(soil.temp, [deg_c], "Soil surface temperature") {
+        # Include insulating effect of snow
+        # TODO: what to do under glaciers?
+        snow_critical_depth := 400 [m m],  # Snow depth at which soil is completely insulated
+        # (from https://www.sciencedirect.com/science/article/abs/pii/016819239290121J)
+        snow_ice_d := aggregate(snow_box.snow) + last(glacier.ice),
+        max_T := last(soil.temp) + (air.temp - last(soil.temp)) * soilT_lag,
+        s_response(snow_ice_d, 0[m m], snow_critical_depth, max_T, 0[deg_c])
+    } @initial { 0[deg_c] }
+    
+    var(soil.thaw_depth, [m m]) {
+        # TODO: what to do under glaciers?
+
+        # Below 0 deg: thaw depth is 0, soils are frozen
+        # Above 0 deg: thaw depth increases logarithmically with surface temp, i.e. rapid initial increase, then slows down as it asymptotically approaches deeper layers. This behaviour is consistent with the physics of heat diffusion and latent heat effects in thawing permafrost.
+        max(0, b * ln((T_b - soil.temp)/T_b))
+    
+        # Alternative: smoothed square root model
+        # Pros compared to previous: less abrupt transitions around 0 degC, and lower calibration need. BUT, found it to be numerically unstable. DROP for now.
+        
+        # Smoothness param: controls how gradually thaw depth increases near 0degC. Can be linked to seasonal temperature variability (e.g. July vs Jan average, or standard deviation of daily air temp over the melt season). Larger variability -> smoother:
+        #e.g. smoothness := st_dev_air_temp / 2  # 2 could be calibrated
+        
+        # Scaling factor: controls the thaw depth at 0 deg. Can be linked to soil and snow thermal properties. E.g. of a formula inspired by Stefan equation:
+        
+        # Constants
+        #k := 1.0       # thermal conductivity (W/m·K)
+        #rho := 1000.0  # bulk density of soil (kg/m³)
+        #L = :334000.0  # latent heat of fusion for water (J/kg)
+        #D = :1000.0    # mean annual cumulative thawing degree-days (°C·days)
+        # (D = sum(max(0, T_air_day) for T_air_day in thaw_season_days))
+
+        #scaling_factor := sqrt(2 * k * D) / (rho * L)
+        
+        # Thaw depth:
+        #scaling_factor * sqrt(ln(1 + exp(soil.temp / smoothness))
+        #T_b=>[m m] * sqrt(ln(1 + exp(soil.temp / (b=>[deg_c]))))
+    }
+
 }

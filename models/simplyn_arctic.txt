@@ -1,0 +1,21 @@
+
+model("SimplyN Arctic") {
+	extend("simplyq_arctic.txt")
+	
+	nitrate : quantity("Nitrate")
+    conductivity : property("Conductivity")
+    labileN: property("Labile N")
+    
+    
+    option(include_qquick) {}
+    @otherwise {
+        # If we had include_qquick, then the permafrost module 
+        # was already loaded in SimplyQ, so no need to do it again
+        
+        load("local_modules/soil.txt",
+            module("SimplyPermafrost", air, soil, snow_box, glacier, snow, ice, temp, thaw_depth))
+    }
+    
+    load("local_modules/nitrogen.txt",
+        module("Arctic N", air, snow_box, glacier, soil, river, water, snow, ice, nitrate, melt, liquid_rain, flow, labileN, conductivity))
+}

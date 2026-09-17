@@ -2,6 +2,10 @@
 model("SimplyQ Arctic") {
 	
 	
+    option_group("Hydrology structure") {
+        include_qquick : par_bool("Include quick flow", false)
+    }
+    
 	sc     : index_set("Subcatchment")
 	patch  : index_set("Patch")  # This is for both land cover and elevation
 
@@ -50,6 +54,16 @@ model("SimplyQ Arctic") {
     aggregation_weight(snow_box, subcatch) { rel_area }
     aggregation_weight(glacier, subcatch) { rel_area }
     
+    option(include_qquick) {
+        downslope  : connection("Downhill quickflow") @directed_graph { snow_box+ river } @no_cycles
+        
+        aggregation_weight(snow_box, snow_box)     { rel_area / rel_area[below] }
+        
+        quick_target : loc(downslope)
+    } @otherwise {
+        quick_target : loc(out) # Just a dummy value that will not be used
+    }
+    
     # Setup solver
 	simply_solver : solver("Simply solver", inca_dascru, [2, hr], 1e-3)
     
@@ -63,13 +77,20 @@ model("SimplyQ Arctic") {
         module("ArcticAtmosphere", air, soil, temp, precip, elev_catch))
     
     load("local_modules/snow_glacier.txt",
-        module("ArcticSnow", air, snow_box, subcatch, water, snow, temp, precip, t_melt, loc(glacier.water)),
+        module("ArcticSnow", air, snow_box, glacier, subcatch, water, snow, ice, temp, precip, flow, t_melt, ice_epsilon, loc(glacier.water), include_qquick, loc(soil.thaw_depth), quick_target),
         module("SimplyGlacier", air, glacier, snow_box, subcatch, water, ice, snow, temp, flow, t_melt, ice_epsilon, loc(soil.water), loc(river.water))
     )
         
     load("local_modules/soil.txt",
-        module("SimplyPermafrostFlow", soil, water, loc(downhill)))
+        module("SimplyPermafrostFlow", soil, water, flow, loc(downhill)))
         
     load("local_modules/river.txt",
         module("SimplyQ river manual", river, water, flow, a_catch, loc(downstream)))
+        
+    option(include_qquick) {
+        # The quick flow formulation uses the soil thaw depth.
+        
+        load("local_modules/soil.txt",
+            module("SimplyPermafrost", air, soil, snow_box, glacier, snow, ice, temp, thaw_depth))
+    }
 }

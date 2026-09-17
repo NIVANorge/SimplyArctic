@@ -1,0 +1,190 @@
+
+module("Arctic N", version(0, 0, 0),
+    air : compartment,
+    snow_box : compartment,
+    glacier : compartment,
+    soil : compartment,
+    river : compartment,
+    water : quantity,
+    snow : quantity,
+    ice : quantity,
+    nitrate : quantity,
+    melt : property,
+    liquid_rain : property,
+    flow : property,
+    labileN : property,
+    conductivity : property,
+) {
+"""
+Nitrate module for coupling with SimplyQ Arctic.
+
+Authors: Leah A. Jackson-Blake
+"""
+    # TODO: This should probably be separated in per-compartment modules
+
+	load("stdlib/basic_math.txt", library("Basic"))
+	load("stdlib/basic_math.txt", library("Response"))
+	
+	par_group("General") {
+		snowconc_type : par_enum("Snowpack computation type", const) { const dynamic }
+		glacmelt_type : par_enum("Glacial melt computation type", const) { const dynamic }
+		soil_type : par_enum("Soil water computation type", dynamic) { const equilibrium dynamic }
+		dynamic_type : par_enum("Soil water dynamics to include", linear_ald_q) {constant linear_ald linear_ald_q sresponse_ald_q}
+	}
+	
+	par_group("Snow") {
+		bulksnow_conc : par_real("Bulk snow concentration",[u g, l-1], 0, 0, 1000)
+		peak_factor : par_real("Peak snow conc multiplication factor",[], 5, 3, 10, "Factor to multiply bulk snow concentration by to get the peak concentration at the start of snow melt")
+		k_snowmelt : par_real("Snow melt concentration exponential decay factor", [], 5, 3, 7)
+	}
+	
+	par_group("Glacier") {
+		glacmelt_conc : par_real("Bulk glacial melt concentration", [u g, l-1], 0, 0, 1000)
+	}
+	
+	par_group("Permafrost") {
+		soilwater_conc : par_real("Baseline soilwater concentration", [u g, l-1], 0, 0, 8000, "Initial conc if soil water conc is dynamic. Constant conc otherwise")
+		weathering_rate : par_real("Production rate", [u g, l-1, m m-1], 5, 0, 100)  # units for flux were [k g, m-2]
+		z0 : par_real("ALD start nitrification", [m m], 300, 0, 100)
+		z1 : par_real("ALD max nitrification rate", [m m], 1000, 10, 50000)
+		min_nitrification_prop : par_real("Minimum nitrification", [], 0, 0, 1, "Min nitrification factor when ald=0 (s-response)")
+		N_bulk : par_real("Max bedrock N", [], 0.1, 0, 0.25, "Weight percent of N in fresh ground bedrock")
+		k_ald : par_real("ALD vs N exponent", [], 1, 0, 2, "Exponent on ALD control on N weathering input")
+		k_q : par_real("Soilwater Q vs N exponent", [], 1, 0, 2, "Exponent on soil water flow control on N weathering input")
+	}
+	
+	par_group("Conductivity") {
+		nitrate_cond_gradient : par_real("Nitrate vs conductivity gradient", [u g, l -1, c m, M ohm], 0.5, 0.01, 2, "Gradient of regression of nitrate vs conductivity ratio (ug/l / uS/cm")
+		nitrate_cond_intercept : par_real("Nitrate vs conductivity intercept", [u g, l-1], 15, 0, 50, "Gradient of regression of nitrate vs conductivity ratio")
+	}
+	
+	# ------------- Snow ------------------       
+	var(snow_box.water.nitrate, [k g, k m -2], [u g, l-1], "Snow and precip nitrate")
+		@initial_conc { bulksnow_conc }
+		#@override_conc {
+		#    fracn_snowmelt := 1 - safe_divide(snow, peak_snow),
+		#    bulksnow_conc if snowconc_type.const,
+		#    (bulksnow_conc * peak_factor) * exp(-k_snowmelt * fracn_snowmelt)      otherwise
+		#},
+		#no_override otherwise
+	# Notes:
+	# - Eqn from lab & field data, Johannessen & Hendriksen (1978): conc_melt / conc_snow_initial = 4.47 e ^(-0.05 * f_snowpack_melted).
+	
+	flux(out, snow_box.water.nitrate, [k g, k m -2, day-1], "Nitrate deposition in rain") 
+		{ snow_box.liquid_rain * bulksnow_conc ->> }
+		   
+	peak_snow : property("Peak snow per year")
+	var(snow_box.peak_snow, [m m]) {
+		# To use in dynamic snowmelt concentration equation
+		snow_box.snow                   if time.day_of_year = 1[day],
+		max(snow_box.snow, last(peak_snow)) otherwise
+	}
+	
+	flux(out, snow_box.water.nitrate, [k g, k m -2, day-1], "Snowmelt nitrate") {
+		fracn_snowmelt := 1 - safe_divide(snow, peak_snow),
+		
+		bulksnow_conc * snow_box.snow.melt ->>                     if snowconc_type.const,
+		
+		(bulksnow_conc * peak_factor) * exp(-k_snowmelt * fracn_snowmelt) * snow_box.snow.melt ->> otherwise
+	}
+	
+	ndep : property("Nitrate deposition")
+	# Not used in the model, but potentially useful for validating concs against modelled or observed N deposition. Note that the timing of this will be off, as it is calculated using snowmelt N.
+	var(air.ndep, [k g, k m -2, day-1], "Nitrate deposition") {
+		fracn_snowmelt := 1 - safe_divide(snow_box.snow, snow_box.peak_snow),
+		snowmelt_nitrate := {
+			bulksnow_conc * snow_box.snow.melt ->>                     if snowconc_type.const,
+			(bulksnow_conc * peak_factor) * exp(-k_snowmelt * fracn_snowmelt) * snow_box.snow.melt ->> otherwise
+		},
+        snow_box.liquid_rain*bulksnow_conc->> + snowmelt_nitrate->>
+	}
+	
+	# ------------- Glacier ------------------
+	
+	var(glacier.ice.nitrate, [k g, k m -2], [u g, l-1], "Glacier ice nitrate")
+		@initial_conc { glacmelt_conc }
+		
+	var(glacier.water.nitrate, [k g, k m -2], [u g, l-1], "Snowmelt, precip & ice melt nitrate")
+	# N.B. glacier.water includes fluxes in from precip, snow melt and glacial melt over all patches, so don't override!
+	# Glacial processes should be modelled through the soil water processes
+		@initial_conc { glacmelt_conc }
+		
+	# ------------ Permafrost sediments ------------------
+	
+	var(soil.labileN, [], "Depth-averaged soil labile N fraction") {
+		#z_m := (z0 + z1) / 2,
+		#k := 0.005[m m-1],
+
+		# Integrate depth-varying N_labile, assumed to follow sigmoid, down to ALD.
+		# Divide by ALD to get depth-averaged labileN (not really necessary, as multiply by ALD in next step, but units confuse me otherwise)
+		# Assume labileN=0 at z=z0 and labileN=N_bulk at z=z1
+		# From soil NH4 vs depth profiles from Andy and plotting with python, decide to fix z0=300mm, z1=1000mm, and shape
+		# parameter k = 0.005 in the first instance
+		# TODO: get Magnus to correct!
+		# TODO: if looks promising, have param that controls whether this is constant or dynamic
+		#safe_divide(1, soil.thaw_depth) * (N_bulk / k) * (ln(1 + exp(-k * (soil.thaw_depth - z_m)) - ln(exp(k * z_m) + 1)))
+		
+		N_bulk
+	}
+	
+	var(soil.water.nitrate, [k g, k m -2], [u g, l-1], "Soil water nitrate")
+		@initial_conc { soilwater_conc }
+		@override_conc {
+            soilwater_conc                                       if soil_type.const,
+            
+            # If an equilibrium, simplest is linear relationship with ALD, where intercept
+            # is snow conc. Gradient here is split into a calibration coefficient and soil bulk N content
+            # for simulating spatial variability (e.g. contrasting catchments)
+            # TODO:
+            # 1) This assumes instant equilibrium (i.e. it's ENC0). Try adding delay (dC/dt = k (ENC0 - C_in) or similar
+            # 2) Add hydrological control?
+            labileN*thaw_depth*weathering_rate + bulksnow_conc   if soil_type.equilibrium,
+            no_override                                          otherwise
+        }
+	
+	flux(out, soil.water.nitrate, [k g, k m-2, day-1], "Net nitrification input") {   
+		# No input from top x mm? (hardcoded for now, but should explore. E.g. soil profiles suggest
+		# should be 20 to 30 cm with low N for valley bottom. But likely shallower on hillslopes)
+		# f_organic := s_response(soil.thaw_depth, 0[m m], 5[m m], 0, 1),
+					
+		#### Constant rate ################
+		soil.labileN * weathering_rate * 1[day-1, m m 2] ->>                  if dynamic_type.constant,
+		
+		# ### Proportional to active layer depth (linear) #######
+		soil.labileN * soil.thaw_depth * weathering_rate * 1[day-1, m m]->>   if dynamic_type.linear_ald,
+		# FIND: not enough input until autumn, then too much. Need to add soil water flow or vol for correct seasonality
+		
+		# ## Proportional to ALD (linear) plus soil water control ###########
+		# Decide it should be water over FC, so that stagnant water doesn't result in nitrification.
+		{
+            d := ((soil.thaw_depth=>[]) ^ k_ald =>[m m]),
+            f := ((flow=>[]) ^ k_q => [m m, day-1]),
+            soil.labileN * d * weathering_rate * f ->>
+        }                                                                     if dynamic_type.linear_ald_q,
+		
+		# ## Non-linear, s-response with upper threshold #######
+		# Helps lessen variability between hillslope classes and years? Has potential to, but calibration forces distribution
+		# of concs between the classes to be similar to previous version.
+		
+		#s_response(soil.thaw_depth, z0, z1, 0[k g, k m-2, day-1], (soil.labileN * weathering_rate * flow * 1[m m]))  ->>        otherwise
+		
+		s_response(soil.thaw_depth, z0, z1, min_nitrification_prop, 1)
+            *(soil.labileN*weathering_rate*flow*1[m m])  ->>                 otherwise
+		
+		# TODO: another option with lagged equilibration to ENC0 (see soilwater_conc when soil_type.equilibrium for ENC0 calculation)
+	
+	# TODO:
+	#flux(soil.water.nitrate, [k g, k m-2, day-1], "Uptake and denitrification"),
+	# xxx    
+
+	}
+	
+	# --------------- River ---------------------
+
+	var(river.water.nitrate, [k g], [u g, l-1], "River water nitrate")
+		@initial_conc { bulksnow_conc }
+	
+	var(river.water.conductivity, [M ohm-1, c m-1], "River water conductivity (uS/cm)") {
+		(conc(river.water.nitrate) - nitrate_cond_intercept) / nitrate_cond_gradient
+	}
+}

@@ -1,13 +1,21 @@
 module("ArcticSnow", version(0, 0, 0),
     air : compartment,
     snow_box : compartment,
+    glacier : compartment,
     subcatch : compartment,
     water : quantity,
     snow : quantity,
+    ice  : quantity,
     temp : property,
     precip : property,
+    flow : property,
     t_melt : constant,
+    ice_epsilon : constant,
     infiltr_target : loc,
+    
+    include_qquick : par_bool,
+    thaw_depth : loc,
+    quick_target : loc,
 ) {
 """
 ODE-based version of the HBV-Nordic snow model.
@@ -22,6 +30,13 @@ Authors: Leah A. Jackson-Blake, Magnus D. Norling
         ddf_melt_dynamic: par_bool("Dynamic ddf_snow", true, "Calculate a dynamic sinusoidal ddf for snowmelt? See code for implementation details")
         refr_eff  : par_real("Refreeze efficiency", [], 0, 0, 1, "Speed of refreeze of liquid water in snow relative to speed of melt at the opposite temperature differential")
         snow_liq  : par_real("Liquid water fraction", [], 0, 0, 0.4, "How many mm liquid water one mm of snow (water equivalents) can hold before the water is released")
+    }
+    
+    option(include_qquick) {
+        par_group("Quick flow parameters") {
+            max_infiltratn_fracn : par_real("Maximum infiltration fraction", [], 1, 0, 1, "Maximum proportion of rain and snowmelt that infiltrates to the soil box once 'ALD for maximum infiltration' is reached")
+            ald_max_infiltration : par_real("ALD for maximum infiltration", [m m], 100, 0, 5000, "Active layer depth at which rain and snowmelt infiltration tend towards the maximum")
+        }
     }
 
     par_group("Initial snow", snow_box) {
@@ -72,7 +87,7 @@ Authors: Leah A. Jackson-Blake, Magnus D. Norling
     
     flux(snow_box.snow, snow_box.water, [m m, day-1], "Snow melt flux") { melt }
 
-    flux(snow_box.water, snow_box.snow, [m m, day-1], "Refreeze")   {
+    flux(snow_box.water, snow_box.snow, [m m, day-1], "Refreeze") {
         pot_refr := max(0, refr_eff * ddf0_melt * (t_melt - air.temp)),
         s_response(water, 0, 1[m m], 0, pot_refr)
     }
@@ -82,14 +97,32 @@ Authors: Leah A. Jackson-Blake, Magnus D. Norling
     #var(snow_box.snow.water_holding_capacity, [], "Snow water holding capacity") {
     #    s_response(snow_box.snow, 100[m m], 300[m m], 0, snow_liq)
     #}
-
-    # Include water holding capacity of snow and refreeze
-    flux(snow_box.water, infiltr_target, [m m, day-1], "Precip & melt infiltration") {
-        
+    
+    var(snow_box.water.flow, [m m, day-1], "Snow box outflow") {
         # The tc just needs to be low enough to be effectively instant (but not so low that it causes numerical instability)
         tc := 0.1[day],
-        max(0, water - snow * snow_liq) / tc
+        max(0, water - snow*snow_liq) / tc
         #max(0, water - snow * snow_box.snow.water_holding_capacity) / tc   otherwise
+    } @no_store
+
+    option(include_qquick) {
+        
+        infiltration : property("Infiltration")
+        var(snow_box.water.infiltration, [m m, day-1]) { 
+            # Assume a simple sigmoid relationship between infiltration and thaw depth in non-glaciated areas.
+            # Assume 0 infiltration when thaw depth=0, all flow goes through soil when thaw depth = z.
+            
+            flow if glacier.ice > ice_epsilon,  # All goes to glacier.water if have glacier ice
+            s_response(thaw_depth, 0[m m], ald_max_infiltration, 0, max_infiltratn_fracn * flow) otherwise
+        }
+        
+        flux(snow_box.water, infiltr_target, [m m, day-1], "Precip & melt infiltration") { infiltration }
+        
+        flux(snow_box.water, quick_target, [m m, day-1], "Quick flow") { flow - infiltration }
+    
+    } @otherwise {
+
+        flux(snow_box.water, infiltr_target, [m m, day-1], "Precip & melt infiltration") {  flow  }
     }
     
     # Aggregate over sub-catchment for convenient display
@@ -143,7 +176,11 @@ Simple glacier melt model.
 	var(glacier.water, [m m], "Glacier compartment water")
 	
 	var(glacier.water.flow, [m m, day-1], "Glacier compartment inflow") {
-		in_flux(water)
+		#in_flux(water)
+        tc := 0.1[day],  # 0.01 instead of 0.05 doubles the model run time
+            # Also add a "fake" field capacity for numerical reasons
+            # TODO: where have glaciers, probably want a big field capacity
+        max(0, (water - 1[m m]) / tc)
 	}
     # Seibert et al. (2018) have a more complex version of this, varying with snow
     # depth. However, don't have glacier melt unless snow is gone, so simplify for now
