@@ -1,0 +1,20 @@
+module("SimplyPermafrostFlow", version(0, 0, 1),
+    soil : compartment,
+    water : quantity,
+    runoff_target : loc
+) {
+
+	load("stdlib/basic_math.txt", library("Response"))
+	
+	par_group("Hydrology land", soil) {
+		fc     : par_real("Field capacity", [m m],                     120,  0, 1000)
+		tc_s   : par_real("Soil water time constant", [day],             2,  1,   40)
+	}
+		
+	var(soil.water, [m m], "Soil water volume")  @initial { fc }
+	
+	flux(soil.water, runoff_target, [m m, day-1], "Soil runoff") { 
+		rate := (water - fc)/tc_s,
+		s_response(water, fc, 1.01*fc, 0, rate) # smoothly turn the flow rate on between water volumes of fc and 1.01*fc
+	}
+}

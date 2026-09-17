@@ -1,0 +1,181 @@
+# Saved from model : "simplyq_arctic_v4-0_simple.txt"
+
+data_set {
+	
+"""
+v2, October 2024, update from v1: extend to 2023. Make use of new QC'd discharge observations from NVE between 2018 and 2023.
+"""
+	
+	series("../DeGeerelva_met_carra_1991-2024-11_shift_pptn-1.xlsx")
+	
+	series("../q_degeerdalen_daily_cleaned_1990-2024_6am-shift-1D-mean.xlsx")
+	
+	series("../DeGeerelva_remote-sensing_thr30_SumSnow.xlsx")
+	
+	sc : index_set("Subcatchment") [ "DeGeerdalen" ]
+	
+	patch : index_set("Patch") [ "Hill6_916" "Hill5_750" "Hill4_584" "Hill3_416" "Hill2_250" "Hill1_83" "Valleys" "Glacier6_916" "Glacier5_750" "Glacier4_583" "Glacier3_416" "Glacier2_250" ]
+	
+	connection("Downhill throughflow") {
+		
+		s : compartment("Soil", patch)
+		river : compartment("River")
+		
+		directed_graph [ 
+			s[ "Hill6_916" ] -> s[ "Hill5_750" ] -> s[ "Hill4_584" ] -> s[ "Hill3_416" ] -> s[ "Hill2_250" ] -> s[ "Hill1_83" ] -> s[ "Valleys" ] -> river[ ]
+			s[ "Glacier6_916" ] -> s[ "Glacier5_750" ] -> s[ "Glacier4_583" ] -> s[ "Glacier3_416" ] -> s[ "Glacier2_250" ] -> river[ ]
+		]
+	}
+	
+	connection("Downstream") {
+		
+		r : compartment("River", sc)
+		
+		directed_graph [ 
+			r[ "DeGeerdalen" ] -> out
+		]
+	}
+	
+	par_group("System") {
+		
+		par_datetime("Start date") 
+		[ 1991-10-01 ]
+		
+		par_datetime("End date") 
+		[ 2024-11-30 ]
+	
+	}
+	
+	par_group("Catchment data") {
+		
+		par_real("Catchment area") 
+		[ 80 ]
+		
+		par_real("Elevation of input met data") 
+		[ 411 ]
+	
+	}
+	
+	par_group("Patch data", patch) {
+		
+		par_real("Relative area") 
+		[ 0.0237 0.0826 0.1486 0.2615 0.2282 0.0619 0.0872 0.0075 0.0324 0.0469 0.0174 0.0019 ]
+	
+	}
+	
+	module("SimplyQ river manual", version(0, 0, 1)) {
+		
+		par_group("Reach parameters", sc) {
+			
+			par_real("Reach length") 
+			[ 10000 ]
+			
+			par_real("Mean velocity") 
+			[ 1 ]
+		
+		}
+	
+	}
+	
+	module("SimplyGlacier", version(0, 0, 1)) {
+		
+		par_group("Glacier global") {
+			
+			par_real("Degree-day factor for ice melt") 
+			[ 5.8 ]
+			
+			par_real("Glacier melt percolation fraction") 
+			[ 0 ]
+		
+		}
+		
+		par_group("Glacier", sc, patch) {
+			
+			par_real("Initial ice thickness") [
+				0 0 0 0 0 0 0 100000 100000 100000 100000 100000 
+			]
+		
+		}
+	
+	}
+	
+	module("ArcticAtmosphere", version(0, 0, 1)) {
+		
+		par_group("Elevation data", sc, patch) {
+			
+			par_real("Average elevation") [
+				866.8 734 575 421.5 254.7 130.9 88.7 867.2 733.1 588 440.5 307.9 
+			]
+		
+		}
+		
+		par_group("Met data correction") {
+			
+			par_real("Temp lapse rate") 
+			[ -0.0049 ]
+		
+		}
+	
+	}
+	
+	module("ArcticSnow", version(0, 0, 2)) {
+		
+		par_group("Snow") {
+			
+			par_real("Degree-day factor for snowmelt") 
+			[ 3.19 ]
+			
+			par_real("Refreeze efficiency") 
+			[ 0 ]
+			
+			par_real("Liquid water fraction") 
+			[ 0 ]
+		
+		}
+		
+		par_group("Initial snow", patch) {
+			
+			par_real("Initial snow depth (water equivalents)") 
+			[ 1000 200 0 0 0 0 0 1000 200 0 0 0 ]
+		
+		}
+	
+	}
+	
+	module("SimplyPermafrostFlow", version(0, 0, 1)) {
+		
+		par_group("Hydrology land", sc, patch) {
+			
+			par_real("Soil water time constant") [
+				0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 
+			]
+			
+			par_real("Field capacity") [
+				1 1 1 1 1 1 1 1 1 1 1 1 
+			]
+		
+		}
+	
+	}
+	
+	module("SensorVariables", version(0, 0, 1)) {
+		
+		par_group("Sensor coefficients", sc) {
+			
+			par_real("Stage_a") 
+			[ 0.5 ]
+			
+			par_real("Stage_b") 
+			[ 0.5 ]
+			
+			par_real("Conductivity_a") 
+			[ -120 ]
+			
+			par_real("Conductivity_b") 
+			[ 641 ]
+		
+		}
+	
+	}
+
+}

@@ -1,0 +1,40 @@
+
+module("SimplyQ river manual", version(0, 0, 1),
+    river : compartment,
+    water : quantity,
+    flow : property,
+    a_catch : par_real,
+    river_target : loc
+) {
+"""
+Extremely simple version of the SimplyQ river module using a user-supplied mean velocity and including a specific discharge calculation
+
+Authors: Leah A. Jackson-Blake
+"""
+
+    par_group("Reach parameters", river) {
+        length   : par_real("Reach length", [m], 10000, 50, 10000000)
+        velocity : par_real("Mean velocity", [m, s-1], 0.3, 0.0001, 8, "Mean water velocity in the reach")
+    }
+    
+    #TODO: The initflow seems pointless in this implementation?
+    init_flow : constant("Initial reach flow", [m 3, s-1], 0)
+    
+    var(river.water, [m 3], "Reach water volume") @initial {
+        init_flow * length / velocity
+    }
+    
+    tc_reach   : property("Reach travel time")
+    var(river.water.tc_reach, [s], "Reach travel time") { length / velocity }
+    
+    var(river.water.flow, [m 3, s-1], "Reach flow") {
+        water / tc_reach
+    } @initial { init_flow } @no_store
+    
+    flux(river.water, river_target, [m 3, s-1], "Daily mean reach flow")  {  flow ->>  }
+    
+    specific_q : property("Subcatchment specific discharge")
+    var(river.water.specific_q, [m m, day-1], "Specific discharge") { 
+        (flow / a_catch) ->>
+    }
+}
