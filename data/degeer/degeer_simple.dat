@@ -1,9 +1,9 @@
-# Saved from model : "simplyq_arctic_v4-0_simple.txt"
+# Saved from model : "simplyq_arctic.txt"
 
 data_set {
 	
 """
-v2, October 2024, update from v1: extend to 2023. Make use of new QC'd discharge observations from NVE between 2018 and 2023.
+Ported setup to the refactored model version.
 """
 	
 	series("../DeGeerelva_met_carra_1991-2024-11_shift_pptn-1.xlsx")
@@ -63,6 +63,13 @@ v2, October 2024, update from v1: extend to 2023. Make use of new QC'd discharge
 	
 	}
 	
+	option_group("Hydrology structure") {
+		
+		par_bool("Include quick flow") 
+		[ false ]
+	
+	}
+	
 	module("SimplyQ river manual", version(0, 0, 1)) {
 		
 		par_group("Reach parameters", sc) {
@@ -72,6 +79,9 @@ v2, October 2024, update from v1: extend to 2023. Make use of new QC'd discharge
 			
 			par_real("Mean velocity") 
 			[ 1 ]
+			
+			par_real("Constant baseflow input") 
+			[ 0 ]
 		
 		}
 	
@@ -99,7 +109,7 @@ v2, October 2024, update from v1: extend to 2023. Make use of new QC'd discharge
 	
 	}
 	
-	module("ArcticAtmosphere", version(0, 0, 1)) {
+	module("ArcticAtmosphere", version(0, 0, 0)) {
 		
 		par_group("Elevation data", sc, patch) {
 			
@@ -113,12 +123,15 @@ v2, October 2024, update from v1: extend to 2023. Make use of new QC'd discharge
 			
 			par_real("Temp lapse rate") 
 			[ -0.0049 ]
+			
+			par_real("Precip lapse rate") 
+			[ 0 ]
 		
 		}
 	
 	}
 	
-	module("ArcticSnow", version(0, 0, 2)) {
+	module("ArcticSnow", version(0, 0, 0)) {
 		
 		par_group("Snow") {
 			
@@ -130,6 +143,9 @@ v2, October 2024, update from v1: extend to 2023. Make use of new QC'd discharge
 			
 			par_real("Liquid water fraction") 
 			[ 0 ]
+			
+			par_bool("Dynamic ddf_snow") 
+			[ true ]
 		
 		}
 		
@@ -144,15 +160,13 @@ v2, October 2024, update from v1: extend to 2023. Make use of new QC'd discharge
 	
 	module("SimplyPermafrostFlow", version(0, 0, 1)) {
 		
-		par_group("Hydrology land", sc, patch) {
+		par_group("Hydrology land", sc) {
 			
-			par_real("Soil water time constant") [
-				0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 
-			]
+			par_real("Soil water time constant") 
+			[ 0.5 ]
 			
-			par_real("Field capacity") [
-				1 1 1 1 1 1 1 1 1 1 1 1 
-			]
+			par_real("Field capacity") 
+			[ 1 ]
 		
 		}
 	

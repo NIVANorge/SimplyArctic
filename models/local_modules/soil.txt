@@ -10,6 +10,7 @@ Compute soil runoff.
 Authors: Leah A. Jackson-Blake, Magnus D. Norling
 """
     # TODO: Name of module is misleading. Soil hydrology is not affected by permafrost
+    # but if we change it we have to change very many modules
 
 	load("stdlib/basic_math.txt", library("Response"))
 		

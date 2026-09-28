@@ -17,5 +17,8 @@ model("SimplyN Arctic") {
     }
     
     load("local_modules/nitrogen.txt",
-        module("Arctic N", air, snow_box, glacier, soil, river, water, snow, ice, nitrate, melt, liquid_rain, flow, labileN, conductivity))
+        module("Arctic N", air, snow_box, glacier, soil, river, 
+            water, snow, ice, nitrate, 
+            melt, liquid_rain, flow, labileN, conductivity, thaw_depth)
+    )
 }

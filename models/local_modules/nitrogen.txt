@@ -14,6 +14,7 @@ module("Arctic N", version(0, 0, 0),
     flow : property,
     labileN : property,
     conductivity : property,
+    thaw_depth : property,
 ) {
 """
 Nitrate module for coupling with SimplyQ Arctic.
@@ -171,13 +172,12 @@ Authors: Leah A. Jackson-Blake
 		s_response(soil.thaw_depth, z0, z1, min_nitrification_prop, 1)
             *(soil.labileN*weathering_rate*flow*1[m m])  ->>                 otherwise
 		
-		# TODO: another option with lagged equilibration to ENC0 (see soilwater_conc when soil_type.equilibrium for ENC0 calculation)
-	
-	# TODO:
-	#flux(soil.water.nitrate, [k g, k m-2, day-1], "Uptake and denitrification"),
-	# xxx    
-
+		# TODO: another option with lagged equilibration to ENC0 (see soilwater_conc when soil_type.equilibrium for ENC0 calculation)  
 	}
+    
+    # TODO:
+	#flux(soil.water.nitrate, [k g, k m-2, day-1], "Uptake and denitrification"),
+	# xxx  
 	
 	# --------------- River ---------------------
 

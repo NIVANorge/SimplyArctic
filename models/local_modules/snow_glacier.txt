@@ -9,6 +9,9 @@ module("ArcticSnow", version(0, 0, 0),
     temp : property,
     precip : property,
     flow : property,
+    melt : property,
+    snowfall : property,
+    liquid_rain : property,
     t_melt : constant,
     ice_epsilon : constant,
     infiltr_target : loc,
@@ -63,11 +66,6 @@ Authors: Leah A. Jackson-Blake, Magnus D. Norling
     }
     
     
-    # FLUXES
-    
-    snowfall : property("Snowfall")
-    liquid_rain : property("Rainfall")
-    melt : property("Snow melt")
     
     var(snow_box.snowfall, [m m, day-1], "Precipitation falling as snow") { air.precip * (air.temp <= t_snow)  } @no_store
 
@@ -156,6 +154,8 @@ module("SimplyGlacier", version(0, 0, 1),
 ) {
 """
 Simple glacier melt model.
+
+Authors: Leah A. Jackson-Blake, Magnus D. Norling
 """
         
 	load("stdlib/basic_math.txt", library("Response"))

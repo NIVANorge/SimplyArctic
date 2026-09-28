@@ -1,0 +1,276 @@
+# Saved from model : "simplyn_arctic.txt"
+
+data_set {
+	
+"""
+Ported setup for the refactored model version.
+"""
+	
+	series("../Adventelva_met_carra_1991-2024-11_shift_pptn-1.xlsx")
+	
+	series("../q_advent_scaled-degeerdalen-obs_daily-6am-mean-shift-1D_1990-2024-10.xlsx")
+	
+	series("../adventelva_sensor_data_niva_2017-2024_6am_mean_filled_UNIS-2015-16.xlsx")
+	
+	series("../Adventelva_nitrogen_data_2025-03.xlsx")
+	
+	series("../Adventelva_remote-sensing_thr30_SumSnow.xlsx")
+	
+	sc : index_set("Subcatchment") [ "Adventelva" ]
+	
+	patch : index_set("Patch") [ "Hill6_916" "Hill5_750" "Hill4_584" "Hill3_416" "Hill2_250" "Hill1_83" "Valleys" "Glacier6_916" "Glacier5_750" "Glacier4_583" "Glacier3_416" "Glacier2_250" ]
+	
+	connection("Downhill throughflow") {
+		
+		s : compartment("Soil", patch)
+		river : compartment("River")
+		
+		directed_graph [ 
+			s[ "Hill6_916" ] -> s[ "Hill5_750" ] -> s[ "Hill4_584" ] -> s[ "Hill3_416" ] -> s[ "Hill2_250" ] -> s[ "Hill1_83" ] -> s[ "Valleys" ] -> river[ ]
+			s[ "Glacier6_916" ] -> s[ "Glacier5_750" ] -> s[ "Glacier4_583" ] -> s[ "Glacier3_416" ] -> s[ "Glacier2_250" ] -> river[ ]
+		]
+	}
+	
+	connection("Downstream") {
+		
+		r : compartment("River", sc)
+		
+		directed_graph [ 
+			r[ "Adventelva" ] -> out
+		]
+	}
+	
+	par_group("System") {
+		
+		par_datetime("Start date") 
+		[ 1991-08-01 ]
+		
+		par_datetime("End date") 
+		[ 2024-11-30 ]
+	
+	}
+	
+	par_group("Catchment data") {
+		
+		par_real("Catchment area") 
+		[ 429 ]
+		
+		par_real("Elevation of input met data") 
+		[ 444 ]
+	
+	}
+	
+	par_group("Patch data", patch) {
+		
+		par_real("Relative area") 
+		[ 0.0388 0.085 0.1417 0.1666 0.1719 0.0732 0.1212 0.0156 0.0734 0.0725 0.0325 0.0074 ]
+	
+	}
+	
+	option_group("Hydrology structure") {
+		
+		par_bool("Include quick flow") 
+		[ false ]
+	
+	}
+	
+	module("SimplyQ river manual", version(0, 0, 1)) {
+		
+		par_group("Reach parameters", sc) {
+			
+			par_real("Reach length") 
+			[ 20000 ]
+			
+			par_real("Mean velocity") 
+			[ 1 ]
+			
+			par_real("Constant baseflow input") 
+			[ 0 ]
+		
+		}
+	
+	}
+	
+	module("SimplyGlacier", version(0, 0, 1)) {
+		
+		par_group("Glacier global") {
+			
+			par_real("Degree-day factor for ice melt") 
+			[ 5.8 ]
+			
+			par_real("Glacier melt percolation fraction") 
+			[ 0 ]
+		
+		}
+		
+		par_group("Glacier", sc, patch) {
+			
+			par_real("Initial ice thickness") [
+				0 0 0 0 0 0 0 100000 100000 100000 100000 100000 
+			]
+		
+		}
+	
+	}
+	
+	module("ArcticAtmosphere", version(0, 0, 0)) {
+		
+		par_group("Elevation data", sc, patch) {
+			
+			par_real("Average elevation") [
+				885 737.7 575 420 246.5 121.6 64.4 875.8 732.4 593.7 437.2 289.5 
+			]
+		
+		}
+		
+		par_group("Met data correction") {
+			
+			par_real("Temp lapse rate") 
+			[ -0.0049 ]
+			
+			par_real("Precip lapse rate") 
+			[ 0 ]
+		
+		}
+	
+	}
+	
+	module("ArcticSnow", version(0, 0, 0)) {
+		
+		par_group("Snow") {
+			
+			par_real("Degree-day factor for snowmelt") 
+			[ 3.13 ]
+			
+			par_bool("Dynamic ddf_snow") 
+			[ true ]
+			
+			par_real("Refreeze efficiency") 
+			[ 0 ]
+			
+			par_real("Liquid water fraction") 
+			[ 0.001 ]
+		
+		}
+		
+		par_group("Initial snow", patch) {
+			
+			par_real("Initial snow depth (water equivalents)") 
+			[ 100 0 0 0 0 0 0 100 0 0 0 0 ]
+		
+		}
+	
+	}
+	
+	module("SimplyPermafrost", version(0, 0, 1)) {
+		
+		par_group("Soil temperature") {
+			
+			par_real("Deep soil temperature") 
+			[ -3 ]
+			
+			par_real("Thermal damping depth") 
+			[ 1340 ]
+			
+			par_real("Soil temp lag factor") 
+			[ 0.0154 ]
+		
+		}
+	
+	}
+	
+	module("SimplyPermafrostFlow", version(0, 0, 1)) {
+		
+		par_group("Hydrology land", sc, patch) {
+			
+			par_real("Field capacity") [
+				5 5 5 5 5 5 5 5 5 5 5 5 
+			]
+			
+			par_real("Soil water time constant") [
+				8 8 8 8 8 8 8 8 8 8 8 8 
+			]
+		
+		}
+	
+	}
+	
+	module("Arctic N", version(0, 0, 0)) {
+		
+		par_group("General") {
+			
+			par_enum("Snowpack computation type") 
+			[ const ]
+			
+			par_enum("Glacial melt computation type") 
+			[ const ]
+			
+			par_enum("Soil water computation type") 
+			[ dynamic ]
+			
+			par_enum("Soil water dynamics to include") 
+			[ sresponse_ald_q ]
+		
+		}
+		
+		par_group("Snow") {
+			
+			par_real("Bulk snow concentration") 
+			[ 90 ]
+			
+			par_real("Peak snow conc multiplication factor") 
+			[ 5 ]
+			
+			par_real("Snow melt concentration exponential decay factor") 
+			[ 5 ]
+		
+		}
+		
+		par_group("Glacier") {
+			
+			par_real("Bulk glacial melt concentration") 
+			[ 70 ]
+		
+		}
+		
+		par_group("Permafrost") {
+			
+			par_real("Baseline soilwater concentration") 
+			[ 60 ]
+			
+			par_real("Production rate") 
+			[ 4100 ]
+			
+			par_real("ALD start nitrification") 
+			[ 0 ]
+			
+			par_real("ALD max nitrification rate") 
+			[ 3600 ]
+			
+			par_real("Max bedrock N") 
+			[ 0.1 ]
+			
+			par_real("ALD vs N exponent") 
+			[ 1 ]
+			
+			par_real("Soilwater Q vs N exponent") 
+			[ 1 ]
+			
+			par_real("Minimum nitrification") 
+			[ 0 ]
+		
+		}
+		
+		par_group("Conductivity") {
+			
+			par_real("Nitrate vs conductivity gradient") 
+			[ 0.5 ]
+			
+			par_real("Nitrate vs conductivity intercept") 
+			[ 15 ]
+		
+		}
+	
+	}
+
+}

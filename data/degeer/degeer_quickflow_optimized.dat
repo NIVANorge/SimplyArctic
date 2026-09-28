@@ -3,7 +3,7 @@
 data_set {
 	
 """
-v4.2.0,hydrology model compatible with conductivity model. Include variable infiltration with active layer depth and routing of quickflow downslope (rather than directly to the reach).
+Ported setup to the refactored model version.
 """
 	
 	series("../DeGeerelva_met_carra_1991-2024-11_shift_pptn-1.xlsx")
@@ -60,7 +60,7 @@ v4.2.0,hydrology model compatible with conductivity model. Include variable infi
 		[ 1991-01-01 ]
 		
 		par_datetime("End date") 
-		[ 2024-11-30 ]
+		[ 2017-12-31 ]
 	
 	}
 	
@@ -103,7 +103,7 @@ v4.2.0,hydrology model compatible with conductivity model. Include variable infi
 		par_group("Glacier global") {
 			
 			par_real("Degree-day factor for ice melt") 
-			[ 6 ]
+			[ 8.18856163369457 ]
 			
 			par_real("Glacier melt percolation fraction") 
 			[ 0 ]
@@ -133,7 +133,7 @@ v4.2.0,hydrology model compatible with conductivity model. Include variable infi
 		par_group("Met data correction") {
 			
 			par_real("Temp lapse rate") 
-			[ -0.005 ]
+			[ -0.0052911046514601 ]
 			
 			par_real("Precip lapse rate") 
 			[ 0 ]
@@ -147,13 +147,13 @@ v4.2.0,hydrology model compatible with conductivity model. Include variable infi
 		par_group("Snow") {
 			
 			par_real("Degree-day factor for snowmelt") 
-			[ 3.2 ]
+			[ 3.27834608155121 ]
 			
 			par_real("Refreeze efficiency") 
-			[ 0 ]
+			[ 0.00382772986091381 ]
 			
 			par_real("Liquid water fraction") 
-			[ 0 ]
+			[ 8.03709280794429e-07 ]
 			
 			par_bool("Dynamic ddf_snow") 
 			[ true ]
@@ -166,7 +166,7 @@ v4.2.0,hydrology model compatible with conductivity model. Include variable infi
 			[ 1 ]
 			
 			par_real("ALD for maximum infiltration") 
-			[ 450 ]
+			[ 440.085085407075 ]
 		
 		}
 		
@@ -181,15 +181,13 @@ v4.2.0,hydrology model compatible with conductivity model. Include variable infi
 	
 	module("SimplyPermafrostFlow", version(0, 0, 1)) {
 		
-		par_group("Hydrology land", sc, patch) {
+		par_group("Hydrology land", sc) {
 			
-			par_real("Field capacity") [
-				5 5 5 5 5 5 5 5 5 5 5 5 
-			]
+			par_real("Field capacity") 
+			[ 5 ]
 			
-			par_real("Soil water time constant") [
-				0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 
-			]
+			par_real("Soil water time constant") 
+			[ 0.736670167422613 ]
 		
 		}
 	

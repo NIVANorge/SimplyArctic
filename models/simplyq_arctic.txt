@@ -20,11 +20,17 @@ model("SimplyQ Arctic") {
 	snow  : quantity("Snow (water equivalents)")
 	ice   : quantity("Ice (water equivalents)")
 	
-	temp       : property("Temperature")
-	precip     : property("Precipitation")
-	flow       : property("Flow")
+	temp        : property("Temperature")
+	precip      : property("Precipitation")
+	flow        : property("Flow")
 	#pet        : property("Potential evapotranspiration")
-    thaw_depth : property("Soil thaw depth")
+    thaw_depth  : property("Soil thaw depth")
+    melt        : property("Snow melt")
+    snowfall    : property("Snowfall")
+    liquid_rain : property("Rainfall")
+    
+    ice_epsilon : constant("Ice epsilon", [m m], 1e-6)  # Just for safe testing of ice thickness > 0
+    t_melt : constant("Melt temperature", [deg_c], 0) # Temperature at which snow and glacier ice start melting
 	
 	downhill   : connection("Downhill throughflow") @directed_graph { soil+ river } @no_cycles
 	downstream : connection("Downstream") @directed_graph { river+ out } @no_cycles
@@ -70,14 +76,11 @@ model("SimplyQ Arctic") {
 	solve(simply_solver, soil.water, river.water, glacier.water)
 	solve(simply_solver, snow_box.water, snow_box.snow, glacier.ice)
     
-    ice_epsilon : constant("Ice epsilon", [m m], 1e-6)  # Just for safe testing of ice thickness > 0
-    t_melt : constant("Melt temperature", [deg_c], 0) # Temperature at which snow and glacier ice start melting
-    
     load("local_modules/atmosphere.txt", 
         module("ArcticAtmosphere", air, soil, temp, precip, elev_catch))
     
     load("local_modules/snow_glacier.txt",
-        module("ArcticSnow", air, snow_box, glacier, subcatch, water, snow, ice, temp, precip, flow, t_melt, ice_epsilon, loc(glacier.water), include_qquick, loc(soil.thaw_depth), quick_target),
+        module("ArcticSnow", air, snow_box, glacier, subcatch, water, snow, ice, temp, precip, flow, melt, snowfall, liquid_rain, t_melt, ice_epsilon, loc(glacier.water), include_qquick, thaw_dpt, quick_target),
         module("SimplyGlacier", air, glacier, snow_box, subcatch, water, ice, snow, temp, flow, t_melt, ice_epsilon, loc(soil.water), loc(river.water))
     )
         
@@ -90,7 +93,10 @@ model("SimplyQ Arctic") {
     option(include_qquick) {
         # The quick flow formulation uses the soil thaw depth.
         
+        thaw_dpt : loc(soil.thaw_depth)
         load("local_modules/soil.txt",
             module("SimplyPermafrost", air, soil, snow_box, glacier, snow, ice, temp, thaw_depth))
+    } @otherwise {
+        thaw_dpt : loc(constant(0)) #NOTE: This one is not used.
     }
 }
