@@ -33,6 +33,7 @@ Authors: Leah A. Jackson-Blake, Magnus D. Norling
         ddf_melt_dynamic: par_bool("Dynamic ddf_snow", true, "Calculate a dynamic sinusoidal ddf for snowmelt? See code for implementation details")
         refr_eff  : par_real("Refreeze efficiency", [], 0, 0, 1, "Speed of refreeze of liquid water in snow relative to speed of melt at the opposite temperature differential")
         snow_liq  : par_real("Liquid water fraction", [], 0, 0, 0.4, "How many mm liquid water one mm of snow (water equivalents) can hold before the water is released")
+        accum     : par_real("Glacier accumulation rate", [day-1], 0, 0, 0.1, "How much snow becomes glacier ice during winter")
     }
     
     option(include_qquick) {
@@ -44,6 +45,12 @@ Authors: Leah A. Jackson-Blake, Magnus D. Norling
 
     par_group("Initial snow", snow_box) {
         init_snow : par_real("Initial snow depth (water equivalents)", [m m], 0, 0, 50000)
+    }
+    
+    option(include_qquick) {
+        par_group("Snow downhill", snow_box) {
+            aval : par_real("Snow downhill movement rate", [], 0, 0, 1, "It is important to set this to 0 in the bottom-most part of a downhill chain, otherwise the snow just disappears")
+        }
     }
     
     #assert("DDF snowmelt amplitude must be smaller than 0.5 * the Degree-day factor for snowmelt to #avoid negative DDF values", snow_box.snow) {
@@ -58,11 +65,10 @@ Authors: Leah A. Jackson-Blake, Magnus D. Norling
     
     ddf : property("Degree-day factor")
     var(snow_box.ddf, [m m, deg_c-1, day-1], "Snow melt degree-day factor") {
-        ddf0_melt if !ddf_melt_dynamic,
-        {
-            ddf_mean := ddf0_melt/2,
-            ddf_mean + ddf_mean*cos(2*pi*(time.day_of_year=>[] - 165) / 365)
-        } otherwise
+        min_factor := 0.1, # Minimal multiplier on ddf0_melt to not exclude melt in warm winters
+    
+        ddf0_melt                                                          if !ddf_melt_dynamic,
+        ddf0_melt*0.5*(1+min_factor + (1-min_factor)*cos(2*pi*(time.day_of_year=>[] - 165) / 365))   otherwise
     }
     
     
@@ -89,18 +95,11 @@ Authors: Leah A. Jackson-Blake, Magnus D. Norling
         pot_refr := max(0, refr_eff * ddf0_melt * (t_melt - air.temp)),
         s_response(water, 0, 1[m m], 0, pot_refr)
     }
-
-    # Tried, but didn't help
-    #water_holding_capacity : property("Water holding capacity")
-    #var(snow_box.snow.water_holding_capacity, [], "Snow water holding capacity") {
-    #    s_response(snow_box.snow, 100[m m], 300[m m], 0, snow_liq)
-    #}
     
     var(snow_box.water.flow, [m m, day-1], "Snow box outflow") {
         # The tc just needs to be low enough to be effectively instant (but not so low that it causes numerical instability)
         tc := 0.1[day],
         max(0, water - snow*snow_liq) / tc
-        #max(0, water - snow * snow_box.snow.water_holding_capacity) / tc   otherwise
     } @no_store
 
     option(include_qquick) {
@@ -117,10 +116,22 @@ Authors: Leah A. Jackson-Blake, Magnus D. Norling
         flux(snow_box.water, infiltr_target, [m m, day-1], "Precip & melt infiltration") { infiltration }
         
         flux(snow_box.water, quick_target, [m m, day-1], "Quick flow") { flow - infiltration }
+        
+        
+        # Avalanches or wind-driven movement of snow downhill
+        flux(snow_box.snow, quick_target, [m m, day-1], "Snow downhill movement") {
+            snowfall := air.precip * (air.temp <= t_snow),
+            aval*snowfall
+        }
     
     } @otherwise {
 
         flux(snow_box.water, infiltr_target, [m m, day-1], "Precip & melt infiltration") {  flow  }
+    }
+    
+    flux(snow_box.snow, glacier.ice, [m m, day-1], "Glacier accumulation") {
+        #NOTE: Ice formation only during freezing season. Don't form a glacier unless there is already one there.
+        snow*accum*(air.temp <= t_melt)*(glacier.ice > ice_epsilon)
     }
     
     # Aggregate over sub-catchment for convenient display

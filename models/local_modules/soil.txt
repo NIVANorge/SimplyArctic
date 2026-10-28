@@ -76,10 +76,14 @@ Authors: Leah A. Jackson-Blake
     
     var(soil.thaw_depth, [m m]) {
         # TODO: what to do under glaciers?
+        
+        max_depth := 10000[m m],
 
         # Below 0 deg: thaw depth is 0, soils are frozen
         # Above 0 deg: thaw depth increases logarithmically with surface temp, i.e. rapid initial increase, then slows down as it asymptotically approaches deeper layers. This behaviour is consistent with the physics of heat diffusion and latent heat effects in thawing permafrost.
-        max(0, b * ln((T_b - soil.temp)/T_b))
+        0                                           if  abs(T_b - temp) < 1e-6[deg_c],
+        max_depth                                   if  T_b >= -1e-6[deg_c],
+        min(max_depth, max(0, b*(ln((T_b - soil.temp)/T_b))  ))  otherwise
     
         # Alternative: smoothed square root model
         # Pros compared to previous: less abrupt transitions around 0 degC, and lower calibration need. BUT, found it to be numerically unstable. DROP for now.

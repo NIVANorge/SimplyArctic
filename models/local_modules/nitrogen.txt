@@ -30,7 +30,7 @@ Authors: Leah A. Jackson-Blake
 		snowconc_type : par_enum("Snowpack computation type", const) { const dynamic }
 		glacmelt_type : par_enum("Glacial melt computation type", const) { const dynamic }
 		soil_type : par_enum("Soil water computation type", dynamic) { const equilibrium dynamic }
-		dynamic_type : par_enum("Soil water dynamics to include", linear_ald_q) {constant linear_ald linear_ald_q sresponse_ald_q}
+		dynamic_type : par_enum("Soil water dynamics to include", sresponse_ald_q) {constant linear_ald linear_ald_q sresponse_ald_q}
 	}
 	
 	par_group("Snow") {
@@ -46,12 +46,12 @@ Authors: Leah A. Jackson-Blake
 	par_group("Permafrost") {
 		soilwater_conc : par_real("Baseline soilwater concentration", [u g, l-1], 0, 0, 8000, "Initial conc if soil water conc is dynamic. Constant conc otherwise")
 		weathering_rate : par_real("Production rate", [u g, l-1, m m-1], 5, 0, 100)  # units for flux were [k g, m-2]
-		z0 : par_real("ALD start nitrification", [m m], 300, 0, 100)
-		z1 : par_real("ALD max nitrification rate", [m m], 1000, 10, 50000)
+		z0      : par_real("ALD start nitrification", [m m], 300, 0, 100)
+		z1      : par_real("ALD max nitrification rate", [m m], 1000, 10, 10000, "Should not be higher than 10 m")
 		min_nitrification_prop : par_real("Minimum nitrification", [], 0, 0, 1, "Min nitrification factor when ald=0 (s-response)")
-		N_bulk : par_real("Max bedrock N", [], 0.1, 0, 0.25, "Weight percent of N in fresh ground bedrock")
-		k_ald : par_real("ALD vs N exponent", [], 1, 0, 2, "Exponent on ALD control on N weathering input")
-		k_q : par_real("Soilwater Q vs N exponent", [], 1, 0, 2, "Exponent on soil water flow control on N weathering input")
+		N_bulk  : par_real("Max bedrock N", [], 0.1, 0, 0.25, "Weight percent of N in fresh ground bedrock")
+		k_ald   : par_real("ALD vs N exponent", [], 1, 0, 2, "Exponent on ALD control on N weathering input")
+		k_q     : par_real("Soilwater Q vs N exponent", [], 1, 0, 2, "Exponent on soil water flow control on N weathering input")
 	}
 	
 	par_group("Conductivity") {
@@ -149,18 +149,18 @@ Authors: Leah A. Jackson-Blake
 		# f_organic := s_response(soil.thaw_depth, 0[m m], 5[m m], 0, 1),
 					
 		#### Constant rate ################
-		soil.labileN * weathering_rate * 1[day-1, m m 2] ->>                  if dynamic_type.constant,
+		soil.labileN * weathering_rate * 1[m m 2, day-1] ->>                  if dynamic_type.constant,
 		
 		# ### Proportional to active layer depth (linear) #######
-		soil.labileN * soil.thaw_depth * weathering_rate * 1[day-1, m m]->>   if dynamic_type.linear_ald,
+		soil.labileN * soil.thaw_depth * weathering_rate * 1[m m, day-1] ->>   if dynamic_type.linear_ald,
 		# FIND: not enough input until autumn, then too much. Need to add soil water flow or vol for correct seasonality
 		
 		# ## Proportional to ALD (linear) plus soil water control ###########
 		# Decide it should be water over FC, so that stagnant water doesn't result in nitrification.
 		{
-            d := ((soil.thaw_depth=>[]) ^ k_ald =>[m m]),
+            d := ((soil.thaw_depth=>[]) ^ k_ald =>[]),
             f := ((flow=>[]) ^ k_q => [m m, day-1]),
-            soil.labileN * d * weathering_rate * f ->>
+            soil.labileN * d * weathering_rate * f * 1[m m] ->>
         }                                                                     if dynamic_type.linear_ald_q,
 		
 		# ## Non-linear, s-response with upper threshold #######
@@ -170,7 +170,7 @@ Authors: Leah A. Jackson-Blake
 		#s_response(soil.thaw_depth, z0, z1, 0[k g, k m-2, day-1], (soil.labileN * weathering_rate * flow * 1[m m]))  ->>        otherwise
 		
 		s_response(soil.thaw_depth, z0, z1, min_nitrification_prop, 1)
-            *(soil.labileN*weathering_rate*flow*1[m m])  ->>                 otherwise
+            *(soil.labileN*weathering_rate*z1*flow)  ->>                 otherwise
 		
 		# TODO: another option with lagged equilibration to ENC0 (see soilwater_conc when soil_type.equilibrium for ENC0 calculation)  
 	}
