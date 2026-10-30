@@ -1,0 +1,224 @@
+# Saved from model : "simplyq_arctic.txt"
+
+data_set {
+	
+"""
+Ported setup to the refactored model version.
+"""
+	
+	series("../DeGeerelva_met_carra_1991-2024-11_shift_pptn-1.xlsx")
+	
+	series("../q_degeerdalen_daily_cleaned_1990-2024_6am-shift-1D-mean.xlsx")
+	
+	series("../DeGeerelva_remote-sensing_thr30_SumSnow.xlsx")
+	
+	sc : index_set("Subcatchment") [ "DeGeerdalen" ]
+	
+	patch : index_set("Patch") [ "Hill6_916" "Hill5_750" "Hill4_584" "Hill3_416" "Hill2_250" "Hill1_83" "Valleys" "Glacier6_916" "Glacier5_750" "Glacier4_583" "Glacier3_416" "Glacier2_250" ]
+	
+	connection("Downhill throughflow") {
+		
+		s : compartment("Soil", patch)
+		river : compartment("River")
+		
+		directed_graph [ 
+			s[ "Hill6_916" ] -> s[ "Hill5_750" ] -> s[ "Hill4_584" ] -> s[ "Hill3_416" ] -> s[ "Hill2_250" ] -> s[ "Hill1_83" ] -> s[ "Valleys" ] -> river[ ]
+			s[ "Glacier6_916" ] -> s[ "Glacier5_750" ] -> s[ "Glacier4_583" ] -> s[ "Glacier3_416" ] -> s[ "Glacier2_250" ] -> river[ ]
+		]
+	}
+	
+	connection("Downhill quickflow") {
+		
+		s : compartment("Snow box", patch)
+		river : compartment("River")
+		
+		directed_graph [ 
+			s[ "Hill6_916" ] -> s[ "Hill5_750" ] -> s[ "Hill4_584" ] -> s[ "Hill3_416" ] -> s[ "Hill2_250" ] -> s[ "Hill1_83" ] -> s[ "Valleys" ] -> river[ ]
+			s[ "Glacier6_916" ] -> s[ "Glacier5_750" ] -> s[ "Glacier4_583" ] -> s[ "Glacier3_416" ] -> s[ "Glacier2_250" ] -> river[ ]
+		]
+	}
+	
+	connection("Downstream") {
+		
+		r : compartment("River", sc)
+		
+		directed_graph [ 
+			r[ "DeGeerdalen" ] -> out
+		]
+	}
+	
+	option_group("Hydrology structure") {
+		
+		par_bool("Include quick flow") 
+		[ true ]
+	
+	}
+	
+	par_group("System") {
+		
+		par_datetime("Start date") 
+		[ 1991-01-01 ]
+		
+		par_datetime("End date") 
+		[ 2024-11-30 ]
+	
+	}
+	
+	par_group("Catchment data") {
+		
+		par_real("Catchment area") 
+		[ 80 ]
+		
+		par_real("Elevation of input met data") 
+		[ 411 ]
+	
+	}
+	
+	par_group("Patch data", patch) {
+		
+		par_real("Relative area") 
+		[ 0.0237 0.0826 0.1486 0.2615 0.2282 0.0619 0.0872 0.0075 0.0324 0.0469 0.0174 0.0019 ]
+	
+	}
+	
+	module("SimplyQ river manual", version(0, 0, 1)) {
+		
+		par_group("Reach parameters", sc) {
+			
+			par_real("Reach length") 
+			[ 10000 ]
+			
+			par_real("Mean velocity") 
+			[ 1 ]
+			
+			par_real("Constant baseflow input") 
+			[ 0 ]
+		
+		}
+	
+	}
+	
+	module("SimplyGlacier", version(0, 0, 1)) {
+		
+		par_group("Glacier global") {
+			
+			par_real("Degree-day factor for ice melt") 
+			[ 6.31801861607278 ]
+			
+			par_real("Glacier melt percolation fraction") 
+			[ 0 ]
+		
+		}
+		
+		par_group("Glacier", sc, patch) {
+			
+			par_real("Initial ice thickness") [
+				0 0 0 0 0 0 0 100000 100000 100000 100000 100000 
+			]
+		
+		}
+	
+	}
+	
+	module("ArcticAtmosphere", version(0, 0, 0)) {
+		
+		par_group("Elevation data", sc, patch) {
+			
+			par_real("Average elevation") [
+				866.8 734 575 421.5 254.7 130.9 88.7 867.2 733.1 588 440.5 307.9 
+			]
+		
+		}
+		
+		par_group("Met data correction") {
+			
+			par_real("Temp lapse rate") 
+			[ -0.00503989297970858 ]
+			
+			par_real("Precip lapse rate") 
+			[ 0 ]
+		
+		}
+	
+	}
+	
+	module("ArcticSnow", version(0, 0, 0)) {
+		
+		par_group("Snow") {
+			
+			par_real("Degree-day factor for snowmelt") 
+			[ 3.2074367074377 ]
+			
+			par_real("Refreeze efficiency") 
+			[ 0.0020492128180456 ]
+			
+			par_real("Liquid water fraction") 
+			[ 2.89199013189467e-05 ]
+			
+			par_bool("Dynamic ddf_snow") 
+			[ true ]
+			
+			par_real("Glacier accumulation rate") 
+			[ 0 ]
+		
+		}
+		
+		par_group("Quick flow parameters") {
+			
+			par_real("Maximum infiltration fraction") 
+			[ 1 ]
+			
+			par_real("ALD for maximum infiltration") 
+			[ 448.547200678025 ]
+		
+		}
+		
+		par_group("Initial snow", patch) {
+			
+			par_real("Initial snow depth (water equivalents)") 
+			[ 1000 200 0 0 0 0 0 1000 200 0 0 0 ]
+		
+		}
+		
+		par_group("Snow downhill", sc, patch) {
+			
+			par_real("Snow downhill movement rate") [
+				0 0 0 0 0 0 0 0 0 0 0 0 
+			]
+		
+		}
+	
+	}
+	
+	module("SimplyPermafrostFlow", version(0, 0, 1)) {
+		
+		par_group("Hydrology land", sc) {
+			
+			par_real("Field capacity") 
+			[ 5 ]
+			
+			par_real("Soil water time constant") 
+			[ 0.848914472337735 ]
+		
+		}
+	
+	}
+	
+	module("SimplyPermafrost", version(0, 0, 1)) {
+		
+		par_group("Soil temperature") {
+			
+			par_real("Deep soil temperature") 
+			[ -3 ]
+			
+			par_real("Thermal damping depth") 
+			[ 1340 ]
+			
+			par_real("Soil temp lag factor") 
+			[ 0.0154 ]
+		
+		}
+	
+	}
+
+}
