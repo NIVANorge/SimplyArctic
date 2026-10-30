@@ -2,6 +2,7 @@ module("SimplyPermafrostFlow", version(0, 0, 1),
     soil : compartment,
     water : quantity,
     flow : property,
+    pet : property,
     runoff_target : loc
 ) {
 """
@@ -22,10 +23,9 @@ Authors: Leah A. Jackson-Blake, Magnus D. Norling
     var(soil.water, [m m], "Soil water volume")  @initial { fc }
     
     # In this simple version, assume PET is small and simplify to 0
-    # flux(soil.water, out, [m m, day-1], "Evapotranspiration") {
-        # 0 if (aggregate(snow_box.snow) > ice_epsilon) | (glacier.ice > ice_epsilon),
-        # s_response(water, 0.5*fc, fc, 0, pet) otherwise
-    # } @no_carry  # Don't carry dissolved substances in the evapotranspiration
+    flux(soil.water, out, [m m, day-1], "Evapotranspiration") {
+        s_response(water, 0.5*fc, fc, 0, pet)
+    } @no_carry  # Don't carry dissolved substances in the evapotranspiration
     
     var(soil.water.flow, [m m, day-1], "Soil water flow"){ 
         rate := (water - fc)/tc_s,
@@ -107,4 +107,30 @@ Authors: Leah A. Jackson-Blake
         #T_b=>[m m] * sqrt(ln(1 + exp(soil.temp / (b=>[deg_c]))))
     }
 
+}
+
+
+module("Degree-day PET", version(1, 0, 0),
+	air  : compartment,
+	soil : compartment,
+	pet  : property,
+	temp : property,
+    is_ice : loc,
+    is_snow: loc
+) {
+"""
+This is a very simple potential evapotranspiration model that uses a linear relationship between PET and air temperature.
+
+Authors: Magnus D. Norling
+"""
+	
+	par_group("Potential evapotranspiration", soil) {
+		ddf_pet   : par_real("Degree-day factor for evapotranspiration", [m m, deg_c -1, day -1], 0, 0, 0.2)
+		pet_min_t : par_real("Minimal temperature for evapotranspiration", [deg_c], 0, -5, 5)
+	}
+	
+	var(soil.pet, [m m, day -1]) { 
+        max(0, ddf_pet*(air.temp - pet_min_t)) if (!is_ice)&(!is_snow),
+        0                                      otherwise
+    }
 }

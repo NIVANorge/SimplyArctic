@@ -246,20 +246,20 @@ Ported setup for the refactored model version.
 		par_group("Snow") {
 			
 			par_real("Bulk snow concentration") 
-			[ 101.849888597529 ]
+			[ 61.8578043490893 ]
 			
 			par_real("Peak snow conc multiplication factor") 
-			[ 9.56537559633933 ]
+			[ 6.12146527905424 ]
 			
 			par_real("Snow melt concentration exponential decay factor") 
-			[ 8.80370748912913 ]
+			[ 9.11404373966808 ]
 		
 		}
 		
 		par_group("Glacier") {
 			
 			par_real("Bulk glacial melt concentration") 
-			[ 225.565364124175 ]
+			[ 189.808111519289 ]
 		
 		}
 		
@@ -269,13 +269,13 @@ Ported setup for the refactored model version.
 			[ 60 ]
 			
 			par_real("Production rate") 
-			[ 1.73251409928108 ]
+			[ 1.72943498902629 ]
 			
 			par_real("ALD start nitrification") 
 			[ 0 ]
 			
 			par_real("ALD max nitrification rate") 
-			[ 9999.99999993955 ]
+			[ 9999.99999864178 ]
 			
 			par_real("Max bedrock N") 
 			[ 0.1 ]
@@ -287,7 +287,7 @@ Ported setup for the refactored model version.
 			[ 1 ]
 			
 			par_real("Minimum nitrification") 
-			[ 6.65578703262781e-13 ]
+			[ 4.11892742135933e-14 ]
 		
 		}
 		
@@ -298,6 +298,22 @@ Ported setup for the refactored model version.
 			
 			par_real("Nitrate vs conductivity intercept") 
 			[ 15 ]
+		
+		}
+	
+	}
+	
+	module("Degree-day PET", version(1, 0, 0)) {
+		
+		par_group("Potential evapotranspiration", sc, patch) {
+			
+			par_real("Degree-day factor for evapotranspiration") [
+				0 0 0 0 0 0 0 0 0 0 0 0 
+			]
+			
+			par_real("Minimal temperature for evapotranspiration") [
+				0 0 0 0 0 0 0 0 0 0 0 0 
+			]
 		
 		}
 	

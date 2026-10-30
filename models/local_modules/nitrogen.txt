@@ -29,8 +29,8 @@ Authors: Leah A. Jackson-Blake
 	par_group("General") {
 		snowconc_type : par_enum("Snowpack computation type", const) { const dynamic }
 		glacmelt_type : par_enum("Glacial melt computation type", const) { const dynamic }
-		soil_type : par_enum("Soil water computation type", dynamic) { const equilibrium dynamic }
-		dynamic_type : par_enum("Soil water dynamics to include", sresponse_ald_q) {constant linear_ald linear_ald_q sresponse_ald_q}
+		soil_type : par_enum("Soil water computation type", dynamic) { const equilibrium dynamic dynamic_equil }
+		dynamic_type : par_enum("Soil water dynamics to include", sresponse_ald_q) { constant linear_ald sresponse_ald_q }
 	}
 	
 	par_group("Snow") {
@@ -45,13 +45,14 @@ Authors: Leah A. Jackson-Blake
 	
 	par_group("Permafrost") {
 		soilwater_conc : par_real("Baseline soilwater concentration", [u g, l-1], 0, 0, 8000, "Initial conc if soil water conc is dynamic. Constant conc otherwise")
-		weathering_rate : par_real("Production rate", [u g, l-1, m m-1], 5, 0, 100)  # units for flux were [k g, m-2]
+		weathering_rate : par_real("Production rate", [u g, l-1, m m-1], 5, 0, 100)
 		z0      : par_real("ALD start nitrification", [m m], 300, 0, 100)
 		z1      : par_real("ALD max nitrification rate", [m m], 1000, 10, 10000, "Should not be higher than 10 m")
-		min_nitrification_prop : par_real("Minimum nitrification", [], 0, 0, 1, "Min nitrification factor when ald=0 (s-response)")
+		min_nitrification_prop : par_real("Minimum nitrification", [], 0, 0, 1, "Min nitrification multiplier when ald=0")
 		N_bulk  : par_real("Max bedrock N", [], 0.1, 0, 0.25, "Weight percent of N in fresh ground bedrock")
 		k_ald   : par_real("ALD vs N exponent", [], 1, 0, 2, "Exponent on ALD control on N weathering input")
-		k_q     : par_real("Soilwater Q vs N exponent", [], 1, 0, 2, "Exponent on soil water flow control on N weathering input")
+		k_q     : par_real("Soilwater Q vs N exponent", [], 1, 0, 2, "Exponent on soil water flow control on N weathering input. Set to 0 for no flow response")
+        k_equil : par_real("Nitrate equilibration speed", [day-1], 1, 0, 10)
 	}
 	
 	par_group("Conductivity") {
@@ -121,64 +122,46 @@ Authors: Leah A. Jackson-Blake
 		# Assume labileN=0 at z=z0 and labileN=N_bulk at z=z1
 		# From soil NH4 vs depth profiles from Andy and plotting with python, decide to fix z0=300mm, z1=1000mm, and shape
 		# parameter k = 0.005 in the first instance
-		# TODO: get Magnus to correct!
-		# TODO: if looks promising, have param that controls whether this is constant or dynamic
-		#safe_divide(1, soil.thaw_depth) * (N_bulk / k) * (ln(1 + exp(-k * (soil.thaw_depth - z_m)) - ln(exp(k * z_m) + 1)))
-		
 		N_bulk
 	}
+    
+    ald_response : property("ALD response")
+    var(soil.water.ald_response, []) {
+        {
+            1                    if dynamic_type.constant,
+            linear_response(thaw_depth, z0, z1, min_nitrification_prop, 1) 
+                                 if dynamic_type.linear_ald,
+            s_response(thaw_depth, z0, z1, min_nitrification_prop, 1)
+                                 otherwise
+        }^k_ald
+    } @no_store
+    
+    enc0 : property("ENC0")
+    var(soil.water.enc0, [u g, l-1]) {
+        labileN*ald_response*weathering_rate*z1 ->>
+    } #@no_store
 	
 	var(soil.water.nitrate, [k g, k m -2], [u g, l-1], "Soil water nitrate")
 		@initial_conc { soilwater_conc }
 		@override_conc {
-            soilwater_conc                                       if soil_type.const,
-            
-            # If an equilibrium, simplest is linear relationship with ALD, where intercept
-            # is snow conc. Gradient here is split into a calibration coefficient and soil bulk N content
-            # for simulating spatial variability (e.g. contrasting catchments)
-            # TODO:
-            # 1) This assumes instant equilibrium (i.e. it's ENC0). Try adding delay (dC/dt = k (ENC0 - C_in) or similar
-            # 2) Add hydrological control?
-            labileN*thaw_depth*weathering_rate + bulksnow_conc   if soil_type.equilibrium,
-            no_override                                          otherwise
+            soilwater_conc         if soil_type.const,
+            enc0 + bulksnow_conc   if soil_type.equilibrium,
+            no_override            otherwise
         }
 	
 	flux(out, soil.water.nitrate, [k g, k m-2, day-1], "Net nitrification input") {   
-		# No input from top x mm? (hardcoded for now, but should explore. E.g. soil profiles suggest
-		# should be 20 to 30 cm with low N for valley bottom. But likely shallower on hillslopes)
-		# f_organic := s_response(soil.thaw_depth, 0[m m], 5[m m], 0, 1),
-					
-		#### Constant rate ################
-		soil.labileN * weathering_rate * 1[m m 2, day-1] ->>                  if dynamic_type.constant,
 		
-		# ### Proportional to active layer depth (linear) #######
-		soil.labileN * soil.thaw_depth * weathering_rate * 1[m m, day-1] ->>   if dynamic_type.linear_ald,
-		# FIND: not enough input until autumn, then too much. Need to add soil water flow or vol for correct seasonality
-		
-		# ## Proportional to ALD (linear) plus soil water control ###########
-		# Decide it should be water over FC, so that stagnant water doesn't result in nitrification.
-		{
-            d := ((soil.thaw_depth=>[]) ^ k_ald =>[]),
-            f := ((flow=>[]) ^ k_q => [m m, day-1]),
-            soil.labileN * d * weathering_rate * f * 1[m m] ->>
-        }                                                                     if dynamic_type.linear_ald_q,
-		
-		# ## Non-linear, s-response with upper threshold #######
-		# Helps lessen variability between hillslope classes and years? Has potential to, but calibration forces distribution
-		# of concs between the classes to be similar to previous version.
-		
-		#s_response(soil.thaw_depth, z0, z1, 0[k g, k m-2, day-1], (soil.labileN * weathering_rate * flow * 1[m m]))  ->>        otherwise
-		
-		s_response(soil.thaw_depth, z0, z1, min_nitrification_prop, 1)
-            *(soil.labileN*weathering_rate*z1*flow)  ->>                 otherwise
-		
-		# TODO: another option with lagged equilibration to ENC0 (see soilwater_conc when soil_type.equilibrium for ENC0 calculation)  
+        {
+            #TODO: more work needed here to make formulations comparable.
+            # We want this expression to create a conc that is comparable to ENC0, but it goes much above.
+            # A bit hard to understand why.
+            flow_response := (flow=>[])^k_q => [m m, day-1],
+            enc0 * flow_response ->>
+        } if soil_type.dynamic,
+        
+        k_equil * water * (enc0 - conc(nitrate)) ->> otherwise # This is soil_type.dynamic_equil, because in other cases the soil conc is forced
 	}
-    
-    # TODO:
-	#flux(soil.water.nitrate, [k g, k m-2, day-1], "Uptake and denitrification"),
-	# xxx  
-	
+
 	# --------------- River ---------------------
 
 	var(river.water.nitrate, [k g], [u g, l-1], "River water nitrate")

@@ -1,20 +1,22 @@
+
 module("ArcticSnow", version(0, 0, 0),
     air : compartment,
     snow_box : compartment,
-    glacier : compartment,
     subcatch : compartment,
     water : quantity,
     snow : quantity,
-    ice  : quantity,
     temp : property,
     precip : property,
     flow : property,
     melt : property,
     snowfall : property,
     liquid_rain : property,
+    is_snow : property,
     t_melt : constant,
     ice_epsilon : constant,
     infiltr_target : loc,
+    accum_target : loc,
+    is_ice : loc,
     
     include_qquick : par_bool,
     thaw_depth : loc,
@@ -71,7 +73,9 @@ Authors: Leah A. Jackson-Blake, Magnus D. Norling
         ddf0_melt*0.5*(1+min_factor + (1-min_factor)*cos(2*pi*(time.day_of_year=>[] - 165) / 365))   otherwise
     }
     
-    
+    var(snow_box.is_snow, []) {
+        snow > ice_epsilon
+    } @no_store
     
     var(snow_box.snowfall, [m m, day-1], "Precipitation falling as snow") { air.precip * (air.temp <= t_snow)  } @no_store
 
@@ -109,7 +113,7 @@ Authors: Leah A. Jackson-Blake, Magnus D. Norling
             # Assume a simple sigmoid relationship between infiltration and thaw depth in non-glaciated areas.
             # Assume 0 infiltration when thaw depth=0, all flow goes through soil when thaw depth = z.
             
-            flow if glacier.ice > ice_epsilon,  # All goes to glacier.water if have glacier ice
+            flow if is_ice,  # All goes to glacier.water if have glacier ice
             s_response(thaw_depth, 0[m m], ald_max_infiltration, 0, max_infiltratn_fracn * flow) otherwise
         }
         
@@ -129,9 +133,9 @@ Authors: Leah A. Jackson-Blake, Magnus D. Norling
         flux(snow_box.water, infiltr_target, [m m, day-1], "Precip & melt infiltration") {  flow  }
     }
     
-    flux(snow_box.snow, glacier.ice, [m m, day-1], "Glacier accumulation") {
+    flux(snow_box.snow, accum_target, [m m, day-1], "Glacier accumulation") {
         #NOTE: Ice formation only during freezing season. Don't form a glacier unless there is already one there.
-        snow*accum*(air.temp <= t_melt)*(glacier.ice > ice_epsilon)
+        snow*accum*(air.temp <= t_melt)*is_ice
     }
     
     # Aggregate over sub-catchment for convenient display
@@ -158,6 +162,7 @@ module("SimplyGlacier", version(0, 0, 1),
     snow : quantity,
     temp : property,
     flow : property,
+    is_ice : property,
     t_melt : constant,
     ice_epsilon : constant,
     infiltr_target : loc,
@@ -201,33 +206,30 @@ Authors: Leah A. Jackson-Blake, Magnus D. Norling
 	
 	# FLUXES
 	# When glacier ice is not present in this compartment (i.e. when the initial glacier ice thickness for this patch = 0), then this compartment is entirely passive. Fluxes from the snow compartment just pass straight through to the soil water compartment and no glacier accumulation occurs. When glacier ice is present, accumulation and melt occur, and melt water either goes directly to the river reach or percolates to the soil water compartment.
-
-	# flux(snow_box.snow, glacier.ice, [m m, day-1], "Glacier accumulation") {
-	# # NOTE this needs revisiting. At the moment, the higher snowtoice is, the MORE glacier ice is lost over the model run (because then the snow disappears quicker and ice melt starts sooner, and ddf for ice melt tends to be higher than for snow melt, which the model seems to like).
-		# snowtoice * snow   if last(glacier.ice) > ice_epsilon,
-		# 0                  otherwise
-	# }
+    
+    var(glacier.is_ice, []) {
+        glacier.ice > ice_epsilon
+    } @no_store
 	
 	glac_melt : property("Glacier melt")
 	var(glacier.ice.glac_melt, [m m, day-1]) {
 		# Smoothly turn-off glacial melt as a function of snow depth (melt goes from max_melt to 0 as snow depth goes from 0 to 5 cm. Quick literature review suggested 5 cm is about appropriate)
 		max_melt := min(last(glacier.ice)*1[day-1], max(0, ddf_ice*(air.temp - t_melt))),
-		s_response(aggregate(snow_box.snow), 0[m m], 50[m m], max_melt, 0[m m])
+		s_response(snow_box.snow, 0[m m], 50[m m], max_melt, 0[m m])
 	} @no_store
-    #TODO: What is the aggregate() around snow_box.snow for? glacier and snow_box are distributed the same.
 
 	flux(glacier.ice, glacier.water, [m m, day-1], "Glacier melt flux") { glac_melt }
 	
 	flux(glacier.water, runoff_target, [m m, day-1], "Glacial runoff") {
 	# Flux of water going directly to the reach (e.g. supraglacial or subglacial streams)
 	# In this simple setup, it's all the flow if have ice, none of it if don't have ice.
-		flow*(1 - mpf)  if ice > ice_epsilon,
+		flow*(1 - mpf)  if is_ice,
 		0               otherwise
 	}
 	
 	flux(glacier.water, infiltr_target, [m m, day-1], "Input to soil water") {
 	# Flux of glacial water down to the soil. For river fluxes (not caring so much about flow pathways), set this extremely simply to just be 0 when have glacial ice, i.e. all meltwater goes straight to supraglacial or subglacial channels. However, this is a huge simplification. TODO: have a proportion of meltwater that goes to the soil. This could be constant, or could vary e.g. depending on whether the glacier is warm or cool-based, time of year, etc. Probably need geochem data to parameterise this.
-		flow*mpf     if ice > ice_epsilon,
+		flow*mpf     if is_ice,
 		flow         otherwise
 	}
 	

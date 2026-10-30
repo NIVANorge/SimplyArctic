@@ -220,5 +220,21 @@ Ported setup to the refactored model version.
 		}
 	
 	}
+	
+	module("Degree-day PET", version(1, 0, 0)) {
+		
+		par_group("Potential evapotranspiration", sc, patch) {
+			
+			par_real("Degree-day factor for evapotranspiration") [
+				0 0 0 0 0 0 0 0 0 0 0 0 
+			]
+			
+			par_real("Minimal temperature for evapotranspiration") [
+				0 0 0 0 0 0 0 0 0 0 0 0 
+			]
+		
+		}
+	
+	}
 
 }
