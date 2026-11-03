@@ -125,21 +125,18 @@ Authors: Leah A. Jackson-Blake
 		N_bulk
 	}
     
-    ald_response : property("ALD response")
-    var(soil.water.ald_response, []) {
-        {
+    enc0 : property("ENC0")
+    var(soil.water.enc0, [u g, l-1]) {
+        ald_response := {
             1                    if dynamic_type.constant,
             linear_response(thaw_depth, z0, z1, min_nitrification_prop, 1) 
                                  if dynamic_type.linear_ald,
             s_response(thaw_depth, z0, z1, min_nitrification_prop, 1)
                                  otherwise
-        }^k_ald
-    } @no_store
-    
-    enc0 : property("ENC0")
-    var(soil.water.enc0, [u g, l-1]) {
+        }^k_ald,
+        
         labileN*ald_response*weathering_rate*z1 ->>
-    } #@no_store
+    } @no_store
 	
 	var(soil.water.nitrate, [k g, k m -2], [u g, l-1], "Soil water nitrate")
 		@initial_conc { soilwater_conc }
@@ -152,10 +149,12 @@ Authors: Leah A. Jackson-Blake
 	flux(out, soil.water.nitrate, [k g, k m-2, day-1], "Net nitrification input") {   
 		
         {
-            #TODO: more work needed here to make formulations comparable.
-            # We want this expression to create a conc that is comparable to ENC0, but it goes much above.
-            # A bit hard to understand why.
-            flow_response := (flow=>[])^k_q => [m m, day-1],
+            # TODO: How to reduce covariance between k_q and weathering rate?
+            #    Ideally something like   qref*(q/qref)^k_q ? But what is qref then? Ideally something close to median flow, but that can't be presupposed
+            
+            # q := flow->[m m, day-1],
+            q := in_flux(water)->[m m, day-1],
+            flow_response := (q=>[])^k_q => [m m, day-1],
             enc0 * flow_response ->>
         } if soil_type.dynamic,
         

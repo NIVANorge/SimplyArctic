@@ -216,10 +216,10 @@ Ported setup for the refactored model version.
 		par_group("Hydrology land") {
 			
 			par_real("Field capacity") 
-			[ 1  ]
+			[ 1 ]
 			
 			par_real("Soil water time constant") 
-			[ 0.5  ]
+			[ 0.5 ]
 		
 		}
 	
@@ -246,7 +246,7 @@ Ported setup for the refactored model version.
 		par_group("Snow") {
 			
 			par_real("Bulk snow concentration") 
-			[ 90 ]
+			[ 60 ]
 			
 			par_real("Peak snow conc multiplication factor") 
 			[ 5 ]
@@ -259,7 +259,7 @@ Ported setup for the refactored model version.
 		par_group("Glacier") {
 			
 			par_real("Bulk glacial melt concentration") 
-			[ 70 ]
+			[ 100 ]
 		
 		}
 		
@@ -269,7 +269,7 @@ Ported setup for the refactored model version.
 			[ 60 ]
 			
 			par_real("Production rate") 
-			[ 1.14 ]
+			[ 12 ]
 			
 			par_real("ALD start nitrification") 
 			[ 0 ]
@@ -288,6 +288,9 @@ Ported setup for the refactored model version.
 			
 			par_real("Minimum nitrification") 
 			[ 0 ]
+			
+			par_real("Nitrate equilibration speed") 
+			[ 1 ]
 		
 		}
 		
@@ -298,6 +301,22 @@ Ported setup for the refactored model version.
 			
 			par_real("Nitrate vs conductivity intercept") 
 			[ 15 ]
+		
+		}
+	
+	}
+	
+	module("Degree-day PET", version(1, 0, 0)) {
+		
+		par_group("Potential evapotranspiration", sc, patch) {
+			
+			par_real("Degree-day factor for evapotranspiration") [
+				0 0 0 0 0 0 0 0 0 0 0 0 
+			]
+			
+			par_real("Minimal temperature for evapotranspiration") [
+				0 0 0 0 0 0 0 0 0 0 0 0 
+			]
 		
 		}
 	
