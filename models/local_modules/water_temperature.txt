@@ -52,7 +52,7 @@ module("Water temperature", version(0, 0, 0),
     # I.e. radiation-based fluxes are either approx. net 0 or are proportional to sensible flux and incorporated into the temperature difference proportional rate.
     # TODO: Ideally it should scale with surface area, not volume as it is implemented now.
     flux(river.water.heat, out, [J, day-1], "River-air heat flux") {
-        # TODO: Access of air temperature is ideal, this averages air.temp over elevation classes since the river is only distributed per subcatch, 
+        # TODO: Access of air temperature is not ideal, this averages air.temp over elevation classes since the river is only distributed per subcatch, 
         # while air.temp is separate per elevation class. But the main part of the river is probably furhter down.
         air_t := max(min_t, aggregate(air.temp)),
         
