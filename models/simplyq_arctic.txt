@@ -43,8 +43,7 @@ model("SimplyQ Arctic") {
 	}
 	
 	par_group("Patch data", soil) {
-		rel_area : par_real("Relative area", [], 0.2,
--        0, 1)
+		rel_area : par_real("Relative area", [], 0.2, 0, 1)
 	}
     
     # Unit conversions when going from patches to reaches

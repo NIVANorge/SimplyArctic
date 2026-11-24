@@ -246,7 +246,7 @@ Ported setup for the refactored model version.
 		par_group("Snow") {
 			
 			par_real("Bulk snow concentration") 
-			[ 48.7155941575686 ]
+			[ 48.342333229036 ]
 			
 			par_real("Peak snow conc multiplication factor") 
 			[ 5 ]
@@ -259,7 +259,7 @@ Ported setup for the refactored model version.
 		par_group("Glacier") {
 			
 			par_real("Bulk glacial melt concentration") 
-			[ 192.971632867981 ]
+			[ 191.475581264406 ]
 		
 		}
 		
@@ -269,13 +269,13 @@ Ported setup for the refactored model version.
 			[ 60 ]
 			
 			par_real("Production rate") 
-			[ 4.99999999886746 ]
+			[ 13.2819035812226 ]
 			
 			par_real("ALD start nitrification") 
 			[ 0 ]
 			
 			par_real("ALD max nitrification rate") 
-			[ 3323.39297768365 ]
+			[ 9999.99999149914 ]
 			
 			par_real("Max bedrock N") 
 			[ 0.1 ]
@@ -287,7 +287,7 @@ Ported setup for the refactored model version.
 			[ 1 ]
 			
 			par_real("Minimum nitrification") 
-			[ 1.66866520601161e-13 ]
+			[ 9.97812943381859e-13 ]
 			
 			par_real("Nitrate equilibration speed") 
 			[ 1 ]

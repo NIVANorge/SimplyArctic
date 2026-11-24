@@ -85,7 +85,7 @@ Authors: Leah A. Jackson-Blake
 	flux(out, snow_box.water.nitrate, [k g, k m -2, day-1], "Snowmelt nitrate") {
 		fracn_snowmelt := 1 - safe_divide(snow, peak_snow),
 		
-		bulksnow_conc * snow_box.snow.melt ->>                     if snowconc_type.const,
+		bulksnow_conc * snow.melt ->>                if snowconc_type.const,
 		
 		(bulksnow_conc * peak_factor) * exp(-k_snowmelt * fracn_snowmelt) * snow_box.snow.melt ->> otherwise
 	}
