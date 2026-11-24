@@ -4,6 +4,7 @@ model("SimplyQ Arctic") {
 	
     option_group("Hydrology structure") {
         include_qquick : par_bool("Include quick flow", false)
+        compute_water_temp : par_bool("Compute water temperature", false)
     }
     
 	sc     : index_set("Subcatchment")
@@ -102,5 +103,18 @@ model("SimplyQ Arctic") {
             module("SimplyPermafrost", air, soil, snow_box, glacier, snow, ice, temp, thaw_depth))
     } @otherwise {
         thaw_dpt : loc(constant(0)) #NOTE: This one is not used.
+    }
+    
+    option(compute_water_temp) {
+        
+        # NOTE: Soil temperature is required for the water temperature module.
+        # If it was already loaded above, Mobius2 knows that it should not load it twice.
+        load("local_modules/soil.txt",
+            module("SimplyPermafrost", air, soil, snow_box, glacier, snow, ice, temp, thaw_depth))
+        
+        heat : quantity("Heat energy")
+        
+        load("local_modules/water_temperature.txt", 
+            module("Water temperature", air, glacier, snow_box, soil, river, water, heat, temp))
     }
 }

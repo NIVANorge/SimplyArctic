@@ -1,0 +1,62 @@
+
+module("Water temperature", version(0, 0, 0),
+    air : compartment,
+    glacier : compartment,
+	snow_box : compartment,
+	soil : compartment,
+	river : compartment,
+    water : quantity,
+	heat : quantity,
+	temp : property
+) {
+	
+    load("stdlib/physiochemistry.txt", library("Water utils"))
+    
+    par_group("Water temperature") {
+        hr : par_real("River air-water sensible heat flux rate", [day-1], 0, 0, 1)
+    }
+	
+    # Simplification, no dynamic computation of melt water temperature. The >0 value approximates some
+    # heating before runoff.
+    melt_t : constant("Melt water initial temperature", [deg_c], 0.2)
+    
+    # Note: we assume running water is always above 0 degrees C,
+    # In a turbulent river, there could be supercooling of the entire water column (due to turbulent mixing),
+    # but that would not go below -0.1 probably, or there could be minor ice formation (which we don't care to model).
+    min_t : constant("Minimum running water temperature", [deg_c], 0)
+	
+	var(snow_box.water.heat, [J, k m -2]) @override {
+        V := water*1[k m 2]->[m 3],
+        water_temp_to_heat(V, melt_t)/1[k m 2]
+    }
+    
+    var(glacier.water.heat, [J, k m-2]) @override {
+        V := water*1[k m 2]->[m 3],
+        water_temp_to_heat(V, melt_t)/1[k m 2]
+    }
+    
+    # TODO: Alternatively, make soil water temp dynamic and make it so that this is a temperature it tends towards.
+    var(soil.water.heat, [J, k m-2]) @override {
+        V := water*1[k m 2]->[m 3],
+        water_temp_to_heat(V, max(min_t, soil.temp))/1[k m 2]
+    }
+    
+    var(river.water.heat, [J])
+    
+    var(river.water.temp, [deg_c]) {
+        water_heat_to_temp(water, heat)
+    }
+    
+    # River - air heat fluxes.
+    # VERY simplified. Assumes "sensible heat flux" only 
+    # (i.e. radiation-based fluxes are approx. net 0 or are proportional to sensible flux and incorporated into the rate).
+    # Ideally it should scale with surface area, not volume.
+    flux(river.water.heat, out, [J, day-1], "River-air heat flux") {
+        # TODO: Not ideal, this averages air.temp over elevation classes since the river is only distributed per subcatch, 
+        # while air.temp is separate per elevation class. But the main part of the river is probably furhter down.
+        
+        air_t := max(min_t, aggregate(air.temp)),
+        air_t_heat_equiv := water_temp_to_heat(water, air_t),
+        hr*(heat - air_t_heat_equiv)
+    }
+}
