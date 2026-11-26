@@ -19,7 +19,8 @@ Authors: Leah A. Jackson-Blake
     }
     
     #TODO: The initflow seems pointless in this implementation?
-    init_flow : constant("Initial reach flow", [m 3, s-1], 0)
+    #   no, it is necessary for the river temperature to not crash.
+    init_flow : constant("Initial reach flow", [m 3, s-1], 1)
     
     var(river.water, [m 3], "Reach water volume") @initial {
         init_flow * length / velocity

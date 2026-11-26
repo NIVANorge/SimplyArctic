@@ -116,5 +116,8 @@ model("SimplyQ Arctic") {
         
         load("local_modules/water_temperature.txt", 
             module("Water temperature", air, glacier, snow_box, soil, river, water, heat, temp))
+        
+        # For averaging temperatures
+        aggregation_weight(air, river) { rel_area }
     }
 }
